@@ -1,0 +1,19 @@
+# Entorno virtual de Python
+venv/
+__pycache__/
+*.pyc
+
+# Base de datos (contiene datos personales, NO va al repo)
+data/*.db
+data/*.db-wal
+data/*.db-shm
+
+# Secrets — NUNCA subir la API key
+config/.env
+*.env
+
+# Logs
+*.log
+
+# Sistema
+.DS_Store

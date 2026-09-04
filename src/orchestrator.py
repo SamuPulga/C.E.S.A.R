@@ -1,0 +1,106 @@
+"""
+Orquestador principal de JARVIS.
+
+Filosofía: Gemini piensa, JARVIS ejecuta.
+  1. El usuario escribe algo.
+  2. Se le manda a Gemini junto con la lista de herramientas disponibles.
+  3. Gemini responde con texto normal, O con una petición de function call.
+  4. Si pide function call: el orquestador VALIDA y ejecuta la función real,
+     y le devuelve el resultado a Gemini para que genere la respuesta final.
+  5. Todo se loguea en SQLite (tabla `logs`) para poder debuggear después.
+
+Requiere: pip install google-generativeai (ver requirements.txt)
+"""
+import os
+import json
+from dotenv import load_dotenv
+import google.generativeai as genai
+
+from src.db import init_db, log_interaccion
+from src.tools.registry import FUNCIONES, DECLARACIONES
+
+load_dotenv("config/.env")
+
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
+
+SYSTEM_PROMPT = """Eres JARVIS, el asistente personal de Samuel, ejecutándose
+en su EliteBook. Eres directo, útil, y usas las herramientas disponibles
+cuando corresponde en vez de inventar información. Si no tienes una
+herramienta para algo, dilo claramente en vez de simular que lo hiciste."""
+
+
+def ejecutar_tool(nombre: str, parametros: dict) -> dict:
+    """
+    Ejecuta una herramienta por nombre, validando que exista en el registro.
+    Este es el punto central de seguridad: nada se ejecuta si no está
+    explícitamente registrado en src/tools/registry.py.
+    """
+    funcion = FUNCIONES.get(nombre)
+    if funcion is None:
+        return {"ok": False, "error": f"Herramienta desconocida: {nombre}"}
+    try:
+        return funcion(**parametros)
+    except TypeError as e:
+        return {"ok": False, "error": f"Parámetros inválidos para {nombre}: {e}"}
+
+
+def procesar_mensaje(modelo, chat, mensaje_usuario: str) -> str:
+    """Procesa un mensaje del usuario, incluyendo el ciclo de function calling."""
+    respuesta = chat.send_message(mensaje_usuario)
+
+    # Revisa si Gemini pidió llamar a una función
+    parte = respuesta.candidates[0].content.parts[0]
+    if hasattr(parte, "function_call") and parte.function_call.name:
+        nombre_tool = parte.function_call.name
+        params = dict(parte.function_call.args)
+
+        resultado = ejecutar_tool(nombre_tool, params)
+        log_interaccion(mensaje_usuario, nombre_tool, params, resultado)
+
+        # Le devolvemos el resultado a Gemini para que genere la respuesta final
+        respuesta_final = chat.send_message(
+            genai.protos.Content(
+                parts=[genai.protos.Part(
+                    function_response=genai.protos.FunctionResponse(
+                        name=nombre_tool,
+                        response={"result": resultado},
+                    )
+                )]
+            )
+        )
+        return respuesta_final.text
+
+    log_interaccion(mensaje_usuario)
+    return respuesta.text
+
+
+def main():
+    if not GEMINI_API_KEY:
+        print("ERROR: falta GEMINI_API_KEY en config/.env — copia config/.env.example primero.")
+        return
+
+    init_db()
+    genai.configure(api_key=GEMINI_API_KEY)
+
+    modelo = genai.GenerativeModel(
+        model_name=GEMINI_MODEL,
+        system_instruction=SYSTEM_PROMPT,
+        tools=[{"function_declarations": DECLARACIONES}],
+    )
+    chat = modelo.start_chat()
+
+    print("JARVIS listo. Escribe 'salir' para terminar.\n")
+    while True:
+        mensaje = input("Tú: ").strip()
+        if mensaje.lower() in ("salir", "exit", "quit"):
+            break
+        if not mensaje:
+            continue
+
+        respuesta = procesar_mensaje(modelo, chat, mensaje)
+        print(f"JARVIS: {respuesta}\n")
+
+
+if __name__ == "__main__":
+    main()
