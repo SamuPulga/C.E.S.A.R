@@ -17,7 +17,7 @@ import os
 DURACION_MAXIMA_SEGUNDOS = 20  # límite de seguridad si nunca detecta silencio
 SILENCIO_UMBRAL = "2%"  # nivel por debajo del cual se considera "silencio" (antes 3%, bajado para captar voz más baja)
 SILENCIO_DURACION = "2.0"  # segundos de silencio seguidos para dejar de grabar
-MODELO_WHISPER = "medium"  # subido de 'small' — más preciso, algo más lento
+MODELO_WHISPER = "large-v3-turbo"  # subido de 'medium' — más preciso, optimizado para velocidad
 
 _modelo = None  # se carga una sola vez (lazy load), porque tarda unos segundos
 
@@ -60,7 +60,16 @@ def escuchar():
         )
 
         modelo = _cargar_modelo()
-        segmentos, _ = modelo.transcribe(wav_path, language="es")
+        segmentos, _ = modelo.transcribe(
+            wav_path,
+            language="es",
+            vad_filter=True,  # filtra silencios/ruido internos, mejora precisión
+            initial_prompt=(
+                "Conversación con JARVIS, un asistente personal. Se habla de "
+                "recordatorios, categorías como trabajo, universidad y personal, "
+                "prioridades baja media y alta, memoria, clima, y consultas generales."
+            ),
+        )
         texto = " ".join(seg.text for seg in segmentos).strip()
 
         if not texto:
