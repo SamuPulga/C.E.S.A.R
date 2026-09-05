@@ -13,6 +13,7 @@ Requiere: pip install google-generativeai (ver requirements.txt)
 """
 import os
 import json
+from datetime import datetime
 from dotenv import load_dotenv
 import google.generativeai as genai
 
@@ -22,12 +23,26 @@ from src.tools.registry import FUNCIONES, DECLARACIONES
 load_dotenv("config/.env")
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-lite")
 
-SYSTEM_PROMPT = """Eres JARVIS, el asistente personal de Samuel, ejecutándose
+
+def construir_system_prompt() -> str:
+    """
+    Genera el prompt de sistema incluyendo la fecha/hora actual real.
+
+    Esto es importante: sin esto, Gemini no sabe qué día es "hoy" y puede
+    asumir un año incorrecto (basado en su fecha de entrenamiento) al
+    interpretar fechas relativas como "el 15 de diciembre" o "mañana".
+    """
+    ahora = datetime.now().strftime("%Y-%m-%d %H:%M (%A)")
+    return f"""Eres JARVIS, el asistente personal de Samuel, ejecutándose
 en su EliteBook. Eres directo, útil, y usas las herramientas disponibles
 cuando corresponde en vez de inventar información. Si no tienes una
-herramienta para algo, dilo claramente en vez de simular que lo hiciste."""
+herramienta para algo, dilo claramente en vez de simular que lo hiciste.
+
+La fecha y hora actual real es: {ahora}. Úsala como referencia para
+interpretar cualquier fecha relativa que mencione el usuario (ej. "mañana",
+"el próximo viernes", "en dos semanas"). No asumas ningún otro año."""
 
 
 def ejecutar_tool(nombre: str, parametros: dict) -> dict:
@@ -85,7 +100,7 @@ def main():
 
     modelo = genai.GenerativeModel(
         model_name=GEMINI_MODEL,
-        system_instruction=SYSTEM_PROMPT,
+        system_instruction=construir_system_prompt(),
         tools=[{"function_declarations": DECLARACIONES}],
     )
     chat = modelo.start_chat()

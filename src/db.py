@@ -16,8 +16,17 @@ CREATE TABLE IF NOT EXISTS recordatorios (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     texto TEXT NOT NULL,
     fecha_hora TEXT NOT NULL,
+    categoria TEXT NOT NULL DEFAULT 'general',
+    prioridad TEXT NOT NULL DEFAULT 'media',  -- baja | media | alta
     estado TEXT NOT NULL DEFAULT 'pendiente',  -- pendiente | cumplido | cancelado
     creado_en TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS memorias (
+    clave TEXT PRIMARY KEY,
+    valor TEXT NOT NULL,
+    creado_en TEXT NOT NULL DEFAULT (datetime('now')),
+    actualizado_en TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS logs (
@@ -30,6 +39,15 @@ CREATE TABLE IF NOT EXISTS logs (
     error TEXT
 );
 """
+
+# Migraciones simples: columnas agregadas después de la creación inicial de
+# una tabla. Cada tupla es (tabla, columna, definición SQL para agregarla).
+# Se aplican solo si la columna todavía no existe, así init_db() se puede
+# llamar de forma segura muchas veces sin duplicar ni fallar.
+MIGRACIONES = [
+    ("recordatorios", "categoria", "TEXT NOT NULL DEFAULT 'general'"),
+    ("recordatorios", "prioridad", "TEXT NOT NULL DEFAULT 'media'"),
+]
 
 
 def get_connection() -> sqlite3.Connection:
@@ -45,10 +63,19 @@ def get_connection() -> sqlite3.Connection:
     return conn
 
 
+def _aplicar_migraciones(conn: sqlite3.Connection):
+    """Agrega columnas nuevas a tablas existentes si todavía no están."""
+    for tabla, columna, definicion in MIGRACIONES:
+        columnas_actuales = {row["name"] for row in conn.execute(f"PRAGMA table_info({tabla})")}
+        if columna not in columnas_actuales:
+            conn.execute(f"ALTER TABLE {tabla} ADD COLUMN {columna} {definicion}")
+
+
 def init_db():
-    """Crea las tablas si no existen. Llamar una vez al arrancar JARVIS."""
+    """Crea las tablas si no existen y aplica migraciones pendientes."""
     conn = get_connection()
     conn.executescript(SCHEMA)
+    _aplicar_migraciones(conn)
     conn.commit()
     conn.close()
 
