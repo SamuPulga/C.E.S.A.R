@@ -3,7 +3,7 @@
 Documento completo original: `docs/PROYECTO_ORIGINAL.md`.
 Este archivo es el resumen vivo de progreso.
 
-## Estado actual: Fase 5 COMPLETA ✅ — Toda la deuda técnica resuelta o aceptada
+## Estado actual: Fase 6 COMPLETA ✅
 
 ### ✅ Fase 0 — Setup e inventario
 Repo, contrato de herramientas, VS Code remoto, zona horaria corregida.
@@ -25,25 +25,19 @@ reales al iPhone vía ntfy.sh.
 ### ✅ Fase 5 — Herramientas de sistema (VALIDADA EN VIVO)
 `consultar_recursos_sistema`, `consultar_temperatura`, `consultar_bateria`.
 
-### ✅ Deuda técnica — Migración de SDK
-Migrado de `google-generativeai` (descontinuado) a `google-genai`. Validado
-en vivo: chat normal + function calling encadenado.
+### ✅ Fase 6 — Internet (VALIDADA EN VIVO)
+- [x] `buscar_en_internet` vía Tavily (1,000 búsquedas/mes gratis, sin tarjeta)
+- [x] Se descartó la búsqueda de Google integrada de Gemini (`grounding`)
+      porque requiere facturación habilitada incluso dentro de su cuota
+      "gratuita" — causó un 429 inmediato en el primer intento
+- [x] Validado: JARVIS busca en internet para info actual (ej. noticias de
+      hoy) pero responde de su propio conocimiento para temas atemporales
+      (ej. La Odisea), sin gastar búsquedas innecesarias
 
-### ✅ Deuda técnica — Seguridad de sudo
-- [x] Se quitó la regla amplia `samupulga ALL=(ALL) NOPASSWD:ALL` (heredada del HPL)
-- [x] Se instaló `/etc/sudoers.d/jarvis-samupulga` con lista blanca específica:
-      systemctl (solo para jarvis-scheduler), apt, rfkill, tailscale,
-      timedatectl set-timezone, netplan apply
-- [x] Validado: comandos de la lista blanca funcionan sin contraseña;
-      cualquier otro comando SÍ pide la contraseña normal del usuario
-
-### ⚪ Riesgo aceptado (decisión consciente, no pendiente)
-- El topic de ntfy.sh (`jarvis-samupulga2026`) es público por nombre en el
-  servidor gratuito de ntfy.sh. Se decidió mantenerlo así: el nombre es
-  suficientemente único, y el riesgo práctico es bajo. Revisar si en algún
-  momento se vuelve una preocupación real (self-host de ntfy sería la
-  alternativa).
+### ✅ Deuda técnica — Migración de SDK y seguridad
+- Migrado a `google-genai`. Sudo restringido con lista blanca. ntfy topic
+  público aceptado como riesgo bajo (decisión consciente).
 
 ### 🔲 Pendiente / próxima sesión
-- [ ] Fase 6 — Internet (búsqueda web, APIs externas, info actual del mundo)
 - [ ] Fase 7 — Voz (STT/TTS, wake word) — decisión pendiente: local vs nube
+- [ ] Considerar caché simple de búsquedas repetidas para cuidar la cuota de Tavily
