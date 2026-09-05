@@ -17,3 +17,6 @@ config/.env
 
 # Sistema
 .DS_Store
+
+# Modelos de voz (Piper) - archivos binarios pesados, se descargan aparte
+voices/

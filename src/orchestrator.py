@@ -17,13 +17,18 @@ descontinuado `google-generativeai`). Ver docs/FASES.md para el historial
 de esta migración.
 """
 import os
+import time
 from datetime import datetime
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
+from google.genai.errors import ServerError, ClientError
 
 from src.db import init_db, log_interaccion
 from src.tools.registry import FUNCIONES, DECLARACIONES
+from src.voz import hablar
+from src.escucha import escuchar
+from src.wakeword import esperar_wake_word
 
 load_dotenv("config/.env")
 
@@ -80,6 +85,24 @@ def ejecutar_tool(nombre: str, parametros: dict) -> dict:
         return {"ok": False, "error": f"Parámetros inválidos para {nombre}: {e}"}
 
 
+def _enviar_con_reintento(chat, mensaje, intentos_maximos=3):
+    """
+    Envía un mensaje al chat, reintentando automáticamente si Google
+    devuelve un error temporal del servidor (500/503 - "alta demanda").
+    Esto evita que JARVIS se cierre por completo por un problema pasajero
+    que se resuelve solo en unos segundos.
+    """
+    for intento in range(1, intentos_maximos + 1):
+        try:
+            return chat.send_message(message=mensaje)
+        except ServerError as e:
+            if intento == intentos_maximos:
+                raise
+            espera = 2 * intento  # espera un poco más en cada reintento
+            print(f"(⚠️  Servidor de Gemini ocupado, reintentando en {espera}s... [{intento}/{intentos_maximos}])")
+            time.sleep(espera)
+
+
 def procesar_mensaje(chat, mensaje_usuario: str) -> str:
     """
     Procesa un mensaje del usuario, incluyendo el ciclo de function calling.
@@ -89,7 +112,7 @@ def procesar_mensaje(chat, mensaje_usuario: str) -> str:
     reintentar con otros parámetros). Por eso este es un LOOP, no una sola
     verificación — se repite hasta que la respuesta sea texto normal.
     """
-    respuesta = chat.send_message(message=mensaje_usuario)
+    respuesta = _enviar_con_reintento(chat, mensaje_usuario)
 
     MAX_LLAMADAS_ENCADENADAS = 5  # límite de seguridad para evitar loops infinitos
     intentos = 0
@@ -112,7 +135,7 @@ def procesar_mensaje(chat, mensaje_usuario: str) -> str:
             name=nombre_tool,
             response={"result": resultado},
         )
-        respuesta = chat.send_message(message=function_response_part)
+        respuesta = _enviar_con_reintento(chat, function_response_part)
         intentos += 1
 
     return "Se alcanzó el límite de intentos encadenados sin obtener una respuesta final. Intenta reformular tu mensaje."
@@ -137,16 +160,31 @@ def main():
 
     chat = client.chats.create(model=GEMINI_MODEL, config=config)
 
-    print("JARVIS listo. Escribe 'salir' para terminar.\n")
-    while True:
-        mensaje = input("Tú: ").strip()
-        if mensaje.lower() in ("salir", "exit", "quit"):
-            break
-        if not mensaje:
-            continue
+    print("JARVIS listo. Di 'hey jarvis' para activarlo. Ctrl+C para apagar.\n")
 
-        respuesta = procesar_mensaje(chat, mensaje)
-        print(f"JARVIS: {respuesta}\n")
+    while True:
+        try:
+            print("👂 Esperando 'hey jarvis'...")
+            esperar_wake_word()
+            print("✅ ¡Activado! Di tu mensaje.")
+
+            mensaje = escuchar()
+            if not mensaje:
+                continue
+            print(f"Tú (voz): {mensaje}")
+
+            try:
+                respuesta = procesar_mensaje(chat, mensaje)
+            except (ServerError, ClientError) as e:
+                print(f"JARVIS: Tuve un problema conectándome con Gemini ({e}). Intenta de nuevo en un momento.\n")
+                continue
+
+            print(f"JARVIS: {respuesta}\n")
+            hablar(respuesta)
+
+        except KeyboardInterrupt:
+            print("\nJARVIS apagado.")
+            break
 
 
 if __name__ == "__main__":
