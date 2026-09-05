@@ -1,0 +1,15 @@
+[Unit]
+Description=JARVIS Scheduler - revisa y notifica recordatorios vencidos
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=samupulga
+WorkingDirectory=/home/samupulga/jarvis
+ExecStart=/home/samupulga/jarvis/venv/bin/python3 -m scripts.scheduler
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
