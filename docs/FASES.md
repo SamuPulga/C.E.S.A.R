@@ -56,6 +56,14 @@ recuperar más adelante si hace falta).
 ### ✅ Robustez — Reintentos ante errores de Gemini
 Errores 500/503 ya no cierran el programa — reintenta con espera progresiva.
 
+### ✅ Ajustes de calidad de voz (sesión del 5 sept)
+- [x] Voz cambiada a `es_AR-daniela-high` (femenina, calidad alta) — antes `es_MX-ald-medium`
+- [x] Modelo de Whisper subido de `small` a `medium` (más preciso)
+- [x] Normalización de audio (`gain -n` en sox) para no depender de gritar
+- [x] Umbral de silencio bajado de 3% a 2% (capta voz más baja)
+- [x] Fix: control ALSA `Dmic0` no sobrevivía reinicios — ahora
+      `scripts/fix_audio.sh` se corre automáticamente al arrancar JARVIS
+
 ### 🔲 Pendiente / próxima sesión
 - [ ] Considerar recuperar la opción de escribir texto como alternativa al wake word
 - [ ] Wake word personalizado ("VAL") — requiere entrenar modelo custom
