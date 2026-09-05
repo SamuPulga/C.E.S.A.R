@@ -3,7 +3,7 @@
 Documento completo original: `docs/PROYECTO_ORIGINAL.md`.
 Este archivo es el resumen vivo de progreso.
 
-## Estado actual: Fase 1 COMPLETA ✅
+## Estado actual: Fase 3 COMPLETA ✅
 
 ### ✅ Fase 0 — Setup e inventario
 - [x] Repo de GitHub creado y estructurado (`SamuPulga/VIS`)
@@ -12,20 +12,29 @@ Este archivo es el resumen vivo de progreso.
 - [x] VS Code + Remote-SSH configurado para trabajar cómodamente
 - [x] Zona horaria corregida: estaba en `Etc/UTC`, ahora en `America/Bogota`
 
-### ✅ Fase 1 — MVP del orquestador (VALIDADA EN VIVO en el EliteBook)
+### ✅ Fase 1 — MVP del orquestador (VALIDADA EN VIVO)
 - [x] Esquema de base de datos con WAL mode (`src/db.py`)
-- [x] Orquestador con function calling de Gemini (`src/orchestrator.py`, modelo `gemini-3.5-flash`)
-- [x] `consultar_hora` — probada ✅
-- [x] `crear_recordatorio` — probada ✅ (interpreta lenguaje natural correctamente)
-- [x] `listar_recordatorios` — probada ✅
-- [x] `eliminar_recordatorio` — probada ✅ (incluso con instrucciones genéricas tipo "cancela todos")
-- [x] Logs de interacción guardándose en SQLite (tabla `logs`)
+- [x] Orquestador con function calling de Gemini
+- [x] `consultar_hora`, `crear_recordatorio`, `listar_recordatorios`, `eliminar_recordatorio`
+- [x] Acceso remoto por Tailscale, probado desde iPhone
 
-### 🔲 Pendiente / ideas para la próxima sesión
-- [ ] Correr `scripts/setup_remote_access.sh` (Tailscale) — para poder seguir trabajando desde la universidad
-- [ ] Decidir la siguiente herramienta o funcionalidad a construir (Fase 2)
+### ✅ Fase 2 — Memoria persistente (VALIDADA EN VIVO)
+- [x] `guardar_memoria`, `consultar_memoria`, `listar_memorias`, `olvidar_memoria`
+- [x] Confirmado que persiste entre reinicios del programa
 
-### 🔲 Fase 2 en adelante
-Ver `docs/PROYECTO_ORIGINAL.md` para el detalle completo de fases siguientes
-(voz, wake word, scheduler persistente, integración con más herramientas,
-seguridad reforzada del `sudo`, etc.)
+### ✅ Fase 3 — Agenda avanzada (VALIDADA EN VIVO)
+- [x] Recordatorios con `categoria` y `prioridad` (baja/media/alta)
+- [x] `modificar_recordatorio` — actualiza campos parciales
+- [x] `listar_recordatorios` con filtros por categoría/prioridad
+- [x] Migración de esquema automática (columnas nuevas sin romper datos viejos)
+- [x] Fix importante: system prompt ahora incluye la fecha/hora real, para
+      que Gemini no asuma un año incorrecto al interpretar fechas relativas
+
+### ⚠️ Deuda técnica pendiente (no urgente)
+- [ ] `google-generativeai` está descontinuado por Google — migrar a `google-genai`
+      antes de construir mucho más encima (no rompe nada por ahora)
+- [ ] Restringir el NOPASSWD de sudo antes de dar a JARVIS herramientas de sistema (Fase 5+)
+
+### 🔲 Pendiente / próxima sesión
+- [ ] Fase 4 — Scheduler real (que los recordatorios avisen de verdad, no solo se guarden)
+- [ ] Fase 5 — Herramientas de sistema Linux (CPU, RAM, batería, disco)
