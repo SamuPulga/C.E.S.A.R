@@ -13,6 +13,7 @@ from src.tools.recordatorios import (
     crear_recordatorio, listar_recordatorios, modificar_recordatorio, eliminar_recordatorio
 )
 from src.tools.memoria import guardar_memoria, consultar_memoria, listar_memorias, olvidar_memoria
+from src.tools.sistema import consultar_recursos_sistema, consultar_temperatura, consultar_bateria
 
 # Mapeo nombre -> función real ejecutable
 FUNCIONES = {
@@ -25,6 +26,9 @@ FUNCIONES = {
     "consultar_memoria": consultar_memoria,
     "listar_memorias": listar_memorias,
     "olvidar_memoria": olvidar_memoria,
+    "consultar_recursos_sistema": consultar_recursos_sistema,
+    "consultar_temperatura": consultar_temperatura,
+    "consultar_bateria": consultar_bateria,
 }
 
 # Declaraciones en formato Gemini function calling
@@ -144,5 +148,20 @@ DECLARACIONES = [
             },
             "required": ["clave"],
         },
+    },
+    {
+        "name": "consultar_recursos_sistema",
+        "description": "Devuelve el uso actual de CPU, RAM y disco del EliteBook.",
+        "parameters": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "consultar_temperatura",
+        "description": "Devuelve la temperatura actual del CPU del EliteBook.",
+        "parameters": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "consultar_bateria",
+        "description": "Devuelve el porcentaje de batería y si está conectado a corriente.",
+        "parameters": {"type": "object", "properties": {}},
     },
 ]
