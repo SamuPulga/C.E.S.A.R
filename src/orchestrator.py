@@ -7,6 +7,7 @@ Filosofía: Gemini piensa, JARVIS ejecuta.
   3. Gemini responde con texto normal, O con una petición de function call.
   4. Si pide function call: el orquestador VALIDA y ejecuta la función real,
      y le devuelve el resultado a Gemini para que genere la respuesta final.
+     Esto puede encadenarse varias veces antes de la respuesta final.
   5. Todo se loguea en SQLite (tabla `logs`) para poder debuggear después.
 
 Requiere: pip install google-generativeai (ver requirements.txt)
@@ -61,20 +62,35 @@ def ejecutar_tool(nombre: str, parametros: dict) -> dict:
 
 
 def procesar_mensaje(modelo, chat, mensaje_usuario: str) -> str:
-    """Procesa un mensaje del usuario, incluyendo el ciclo de function calling."""
+    """
+    Procesa un mensaje del usuario, incluyendo el ciclo de function calling.
+
+    IMPORTANTE: Gemini puede encadenar VARIAS llamadas a herramientas antes
+    de dar una respuesta final en texto (ej. si la primera falla y necesita
+    reintentar con otros parámetros). Por eso este es un LOOP, no una sola
+    verificación — se repite hasta que la respuesta sea texto normal.
+    """
     respuesta = chat.send_message(mensaje_usuario)
 
-    # Revisa si Gemini pidió llamar a una función
-    parte = respuesta.candidates[0].content.parts[0]
-    if hasattr(parte, "function_call") and parte.function_call.name:
+    MAX_LLAMADAS_ENCADENADAS = 5  # límite de seguridad para evitar loops infinitos
+    intentos = 0
+
+    while intentos < MAX_LLAMADAS_ENCADENADAS:
+        parte = respuesta.candidates[0].content.parts[0]
+
+        if not (hasattr(parte, "function_call") and parte.function_call.name):
+            # Ya no hay más llamadas a herramientas, esto es la respuesta final
+            if intentos == 0:
+                log_interaccion(mensaje_usuario)  # no se usó ninguna herramienta
+            return respuesta.text
+
         nombre_tool = parte.function_call.name
         params = dict(parte.function_call.args)
 
         resultado = ejecutar_tool(nombre_tool, params)
         log_interaccion(mensaje_usuario, nombre_tool, params, resultado)
 
-        # Le devolvemos el resultado a Gemini para que genere la respuesta final
-        respuesta_final = chat.send_message(
+        respuesta = chat.send_message(
             genai.protos.Content(
                 parts=[genai.protos.Part(
                     function_response=genai.protos.FunctionResponse(
@@ -84,10 +100,9 @@ def procesar_mensaje(modelo, chat, mensaje_usuario: str) -> str:
                 )]
             )
         )
-        return respuesta_final.text
+        intentos += 1
 
-    log_interaccion(mensaje_usuario)
-    return respuesta.text
+    return "Se alcanzó el límite de intentos encadenados sin obtener una respuesta final. Intenta reformular tu mensaje."
 
 
 def main():
