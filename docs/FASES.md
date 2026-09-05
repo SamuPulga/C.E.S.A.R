@@ -3,7 +3,7 @@
 Documento completo original: `docs/PROYECTO_ORIGINAL.md`.
 Este archivo es el resumen vivo de progreso.
 
-## Estado actual: Fase 5 COMPLETA ✅ (+ deuda técnica resuelta)
+## Estado actual: Fase 5 COMPLETA ✅ — Toda la deuda técnica resuelta o aceptada
 
 ### ✅ Fase 0 — Setup e inventario
 Repo, contrato de herramientas, VS Code remoto, zona horaria corregida.
@@ -23,20 +23,26 @@ Categorías, prioridades, `modificar_recordatorio`, migración de esquema autom�
 reales al iPhone vía ntfy.sh.
 
 ### ✅ Fase 5 — Herramientas de sistema (VALIDADA EN VIVO)
-`consultar_recursos_sistema`, `consultar_temperatura`, `consultar_bateria` (vía `psutil`).
+`consultar_recursos_sistema`, `consultar_temperatura`, `consultar_bateria`.
 
-### ✅ Migración de SDK (deuda técnica resuelta)
-- [x] Migrado de `google-generativeai` (descontinuado) a `google-genai`
-- [x] Nuevo cliente: `genai.Client()` + `client.chats.create()`
-- [x] Function calling manual reescrito con `types.FunctionDeclaration`,
-      `types.Tool`, `AutomaticFunctionCallingConfig(disable=True)`
-- [x] Validado en vivo: chat normal + function calling encadenado (2 tools
-      en un mismo mensaje: hora + batería)
+### ✅ Deuda técnica — Migración de SDK
+Migrado de `google-generativeai` (descontinuado) a `google-genai`. Validado
+en vivo: chat normal + function calling encadenado.
 
-### ⚠️ Deuda técnica restante (no urgente)
-- [ ] Restringir el NOPASSWD de sudo antes de dar a JARVIS herramientas que
-      modifiquen el sistema (las actuales de Fase 5 son solo lectura, sin riesgo)
-- [ ] El topic de ntfy.sh es público por nombre — considerar self-host o auth
+### ✅ Deuda técnica — Seguridad de sudo
+- [x] Se quitó la regla amplia `samupulga ALL=(ALL) NOPASSWD:ALL` (heredada del HPL)
+- [x] Se instaló `/etc/sudoers.d/jarvis-samupulga` con lista blanca específica:
+      systemctl (solo para jarvis-scheduler), apt, rfkill, tailscale,
+      timedatectl set-timezone, netplan apply
+- [x] Validado: comandos de la lista blanca funcionan sin contraseña;
+      cualquier otro comando SÍ pide la contraseña normal del usuario
+
+### ⚪ Riesgo aceptado (decisión consciente, no pendiente)
+- El topic de ntfy.sh (`jarvis-samupulga2026`) es público por nombre en el
+  servidor gratuito de ntfy.sh. Se decidió mantenerlo así: el nombre es
+  suficientemente único, y el riesgo práctico es bajo. Revisar si en algún
+  momento se vuelve una preocupación real (self-host de ntfy sería la
+  alternativa).
 
 ### 🔲 Pendiente / próxima sesión
 - [ ] Fase 6 — Internet (búsqueda web, APIs externas, info actual del mundo)
