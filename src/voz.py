@@ -12,7 +12,7 @@ import tempfile
 import os
 import re
 
-VOICE_MODEL = "voices/es_MX-ald-medium.onnx"
+VOICE_MODEL = "voices/es_AR-daniela-high.onnx"
 
 
 def _limpiar_para_voz(texto: str) -> str:

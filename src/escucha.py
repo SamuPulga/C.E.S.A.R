@@ -15,9 +15,9 @@ import tempfile
 import os
 
 DURACION_MAXIMA_SEGUNDOS = 20  # límite de seguridad si nunca detecta silencio
-SILENCIO_UMBRAL = "3%"  # nivel por debajo del cual se considera "silencio"
+SILENCIO_UMBRAL = "2%"  # nivel por debajo del cual se considera "silencio" (antes 3%, bajado para captar voz más baja)
 SILENCIO_DURACION = "2.0"  # segundos de silencio seguidos para dejar de grabar
-MODELO_WHISPER = "small"  # buen balance entre precisión y velocidad en CPU
+MODELO_WHISPER = "medium"  # subido de 'small' — más preciso, algo más lento
 
 _modelo = None  # se carga una sola vez (lazy load), porque tarda unos segundos
 
@@ -52,6 +52,7 @@ def escuchar():
                 wav_path,
                 "silence", "1", "0.1", SILENCIO_UMBRAL,
                 "1", SILENCIO_DURACION, SILENCIO_UMBRAL,
+                "gain", "-n",  # normaliza el volumen grabado (ayuda si se habla bajo)
             ],
             check=True,
             capture_output=True,

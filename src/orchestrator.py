@@ -18,6 +18,7 @@ de esta migración.
 """
 import os
 import time
+import subprocess
 from datetime import datetime
 from dotenv import load_dotenv
 from google import genai
@@ -34,6 +35,24 @@ load_dotenv("config/.env")
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-lite")
+
+
+def _asegurar_audio():
+    """
+    Corre scripts/fix_audio.sh al arrancar, para garantizar que los
+    controles de volumen/mute de ALSA estén bien configurados — en este
+    hardware específico, algunos no sobreviven confiablemente un reinicio.
+    Falla en silencio si el script no está o algo sale mal; no debe
+    impedir que JARVIS arranque.
+    """
+    try:
+        subprocess.run(
+            ["bash", "scripts/fix_audio.sh"],
+            capture_output=True,
+            timeout=10,
+        )
+    except Exception:
+        pass  # si falla, seguimos igual; el usuario puede ajustarlo a mano
 
 
 def construir_system_prompt() -> str:
@@ -147,6 +166,7 @@ def main():
         return
 
     init_db()
+    _asegurar_audio()
     client = genai.Client(api_key=GEMINI_API_KEY)
 
     config = types.GenerateContentConfig(
