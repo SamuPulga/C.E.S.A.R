@@ -10,13 +10,17 @@ Filosofía: Gemini piensa, JARVIS ejecuta.
      Esto puede encadenarse varias veces antes de la respuesta final.
   5. Todo se loguea en SQLite (tabla `logs`) para poder debuggear después.
 
-Requiere: pip install google-generativeai (ver requirements.txt)
+Requiere: pip install google-genai (ver requirements.txt)
+
+NOTA: este archivo usa el SDK nuevo `google-genai` (el que reemplaza al
+descontinuado `google-generativeai`). Ver docs/FASES.md para el historial
+de esta migración.
 """
 import os
-import json
 from datetime import datetime
 from dotenv import load_dotenv
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 from src.db import init_db, log_interaccion
 from src.tools.registry import FUNCIONES, DECLARACIONES
@@ -46,6 +50,19 @@ interpretar cualquier fecha relativa que mencione el usuario (ej. "mañana",
 "el próximo viernes", "en dos semanas"). No asumas ningún otro año."""
 
 
+def construir_tool() -> types.Tool:
+    """Convierte nuestro registro de herramientas (dicts) al formato del SDK nuevo."""
+    declaraciones = [
+        types.FunctionDeclaration(
+            name=d["name"],
+            description=d["description"],
+            parameters_json_schema=d["parameters"],
+        )
+        for d in DECLARACIONES
+    ]
+    return types.Tool(function_declarations=declaraciones)
+
+
 def ejecutar_tool(nombre: str, parametros: dict) -> dict:
     """
     Ejecuta una herramienta por nombre, validando que exista en el registro.
@@ -61,7 +78,7 @@ def ejecutar_tool(nombre: str, parametros: dict) -> dict:
         return {"ok": False, "error": f"Parámetros inválidos para {nombre}: {e}"}
 
 
-def procesar_mensaje(modelo, chat, mensaje_usuario: str) -> str:
+def procesar_mensaje(chat, mensaje_usuario: str) -> str:
     """
     Procesa un mensaje del usuario, incluyendo el ciclo de function calling.
 
@@ -70,36 +87,30 @@ def procesar_mensaje(modelo, chat, mensaje_usuario: str) -> str:
     reintentar con otros parámetros). Por eso este es un LOOP, no una sola
     verificación — se repite hasta que la respuesta sea texto normal.
     """
-    respuesta = chat.send_message(mensaje_usuario)
+    respuesta = chat.send_message(message=mensaje_usuario)
 
     MAX_LLAMADAS_ENCADENADAS = 5  # límite de seguridad para evitar loops infinitos
     intentos = 0
 
     while intentos < MAX_LLAMADAS_ENCADENADAS:
-        parte = respuesta.candidates[0].content.parts[0]
-
-        if not (hasattr(parte, "function_call") and parte.function_call.name):
+        if not respuesta.function_calls:
             # Ya no hay más llamadas a herramientas, esto es la respuesta final
             if intentos == 0:
                 log_interaccion(mensaje_usuario)  # no se usó ninguna herramienta
             return respuesta.text
 
-        nombre_tool = parte.function_call.name
-        params = dict(parte.function_call.args)
+        function_call = respuesta.function_calls[0]
+        nombre_tool = function_call.name
+        params = dict(function_call.args)
 
         resultado = ejecutar_tool(nombre_tool, params)
         log_interaccion(mensaje_usuario, nombre_tool, params, resultado)
 
-        respuesta = chat.send_message(
-            genai.protos.Content(
-                parts=[genai.protos.Part(
-                    function_response=genai.protos.FunctionResponse(
-                        name=nombre_tool,
-                        response={"result": resultado},
-                    )
-                )]
-            )
+        function_response_part = types.Part.from_function_response(
+            name=nombre_tool,
+            response={"result": resultado},
         )
+        respuesta = chat.send_message(message=function_response_part)
         intentos += 1
 
     return "Se alcanzó el límite de intentos encadenados sin obtener una respuesta final. Intenta reformular tu mensaje."
@@ -111,14 +122,18 @@ def main():
         return
 
     init_db()
-    genai.configure(api_key=GEMINI_API_KEY)
+    client = genai.Client(api_key=GEMINI_API_KEY)
 
-    modelo = genai.GenerativeModel(
-        model_name=GEMINI_MODEL,
+    config = types.GenerateContentConfig(
         system_instruction=construir_system_prompt(),
-        tools=[{"function_declarations": DECLARACIONES}],
+        tools=[construir_tool()],
+        # Deshabilitado a propósito: queremos ejecutar las herramientas
+        # nosotros mismos (vía ejecutar_tool), validándolas contra el
+        # registro central, no dejar que el SDK las llame automáticamente.
+        automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
     )
-    chat = modelo.start_chat()
+
+    chat = client.chats.create(model=GEMINI_MODEL, config=config)
 
     print("JARVIS listo. Escribe 'salir' para terminar.\n")
     while True:
@@ -128,7 +143,7 @@ def main():
         if not mensaje:
             continue
 
-        respuesta = procesar_mensaje(modelo, chat, mensaje)
+        respuesta = procesar_mensaje(chat, mensaje)
         print(f"JARVIS: {respuesta}\n")
 
 
