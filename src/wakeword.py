@@ -22,6 +22,8 @@ import os
 import numpy as np
 import alsaaudio
 import openwakeword
+import time
+import threading
 from openwakeword.model import Model
 
 PKG_DIR = os.path.dirname(openwakeword.__file__)
@@ -40,24 +42,39 @@ def _cargar_modelo():
     return _modelo
 
 
-def esperar_wake_word():
+def esperar_wake_word(pausar: threading.Event = None):
     """
     Bloquea hasta detectar "hey jarvis". Abre y cierra su propia captura
-    de audio en cada llamada, para dejar el micrófono libre mientras se
-    graba el comando después (usando `sox` desde src/escucha.py).
+    de audio, para dejar el micrófono libre mientras se graba el comando
+    después (usando `sox` desde src/escucha.py).
+
+    Si se pasa un `pausar` (threading.Event) y se activa desde afuera,
+    suelta el micrófono y espera hasta que se desactive de nuevo — esto
+    permite que otro modo (ej. "presiona Enter para hablar") use el
+    micrófono sin chocar con esta escucha continua en segundo plano.
     """
     modelo = _cargar_modelo()
-
-    captura = alsaaudio.PCM(
-        alsaaudio.PCM_CAPTURE, alsaaudio.PCM_NORMAL, device="plughw:0,6"
-    )
-    captura.setchannels(1)
-    captura.setrate(SAMPLE_RATE)
-    captura.setformat(alsaaudio.PCM_FORMAT_S16_LE)
-    captura.setperiodsize(CHUNK)
+    captura = None
 
     try:
         while True:
+            if pausar is not None and pausar.is_set():
+                if captura is not None:
+                    captura.close()
+                    captura = None
+                    time.sleep(0.3)
+                time.sleep(0.1)
+                continue
+
+            if captura is None:
+                captura = alsaaudio.PCM(
+                    alsaaudio.PCM_CAPTURE, alsaaudio.PCM_NORMAL, device="plughw:0,6"
+                )
+                captura.setchannels(1)
+                captura.setrate(SAMPLE_RATE)
+                captura.setformat(alsaaudio.PCM_FORMAT_S16_LE)
+                captura.setperiodsize(CHUNK)
+
             longitud, datos = captura.read()
             if longitud <= 0:
                 continue
@@ -70,4 +87,9 @@ def esperar_wake_word():
             if prediccion.get("hey_jarvis_v0.1", 0) > UMBRAL:
                 return
     finally:
-        captura.close()
+        if captura is not None:
+            captura.close()
+            # Pausa breve para que el driver de audio (chip con DSP tipo SOF)
+            # libere de verdad el dispositivo antes de que otro proceso (sox)
+            # intente abrirlo.
+            time.sleep(0.3)

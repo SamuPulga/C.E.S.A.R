@@ -13,6 +13,7 @@ para descargar los pesos del modelo).
 import subprocess
 import tempfile
 import os
+import time
 
 DURACION_MAXIMA_SEGUNDOS = 20  # límite de seguridad si nunca detecta silencio
 SILENCIO_UMBRAL = "2%"  # nivel por debajo del cual se considera "silencio" (antes 3%, bajado para captar voz más baja)
@@ -45,7 +46,7 @@ def escuchar():
             wav_path = f.name
 
         print("🎙️  Escuchando... habla ahora (se detiene sola cuando dejes de hablar)")
-        subprocess.run(
+        resultado = subprocess.run(
             [
                 "sox", "-t", "alsa", "plughw:0,6",
                 "-c", "1", "-r", "16000", "-b", "16",
@@ -54,10 +55,14 @@ def escuchar():
                 "1", SILENCIO_DURACION, SILENCIO_UMBRAL,
                 "gain", "-n",  # normaliza el volumen grabado (ayuda si se habla bajo)
             ],
-            check=True,
             capture_output=True,
             timeout=DURACION_MAXIMA_SEGUNDOS,
         )
+        if resultado.returncode != 0:
+            error_real = resultado.stderr.decode(errors="replace").strip()
+            print(f"(⚠️  sox falló: {error_real})")
+            time.sleep(1)  # pausa defensiva, para no reintentar en loop inmediato
+            return None
 
         modelo = _cargar_modelo()
         segmentos, _ = modelo.transcribe(

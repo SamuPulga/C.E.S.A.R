@@ -19,6 +19,7 @@ de esta migración.
 import os
 import time
 import subprocess
+import threading
 from datetime import datetime
 from dotenv import load_dotenv
 from google import genai
@@ -180,31 +181,85 @@ def main():
 
     chat = client.chats.create(model=GEMINI_MODEL, config=config)
 
-    print("JARVIS listo. Di 'hey jarvis' para activarlo. Ctrl+C para apagar.\n")
+    # Un solo candado compartido entre el hilo de wake word y el hilo
+    # principal (teclado), para que nunca intenten usar el micrófono o
+    # hablarle a Gemini al mismo tiempo — se turnan.
+    audio_lock = threading.Lock()
+    # Señal para pausar el wake word mientras el modo "presiona Enter para
+    # hablar" usa el micrófono directamente (si no, chocan por el mismo
+    # dispositivo de audio exclusivo).
+    pausar_wakeword = threading.Event()
 
-    while True:
+    def procesar_y_responder(mensaje: str):
         try:
-            print("👂 Esperando 'hey jarvis'...")
-            esperar_wake_word()
-            print("✅ ¡Activado! Di tu mensaje.")
+            respuesta = procesar_mensaje(chat, mensaje)
+        except (ServerError, ClientError) as e:
+            print(f"JARVIS: Tuve un problema conectándome con Gemini ({e}). Intenta de nuevo en un momento.\n")
+            return
+        print(f"JARVIS: {respuesta}\n")
+        hablar(respuesta)
 
-            mensaje = escuchar()
-            if not mensaje:
-                continue
-            print(f"Tú (voz): {mensaje}")
-
+    def hilo_wake_word(detener: threading.Event):
+        """Corre en segundo plano todo el tiempo, escuchando 'hey jarvis'."""
+        while not detener.is_set():
             try:
-                respuesta = procesar_mensaje(chat, mensaje)
-            except (ServerError, ClientError) as e:
-                print(f"JARVIS: Tuve un problema conectándome con Gemini ({e}). Intenta de nuevo en un momento.\n")
+                esperar_wake_word(pausar=pausar_wakeword)
+            except Exception as e:
+                print(f"(⚠️  Error en detección de wake word: {e})")
+                time.sleep(2)  # evita un loop agresivo si el error persiste
                 continue
 
-            print(f"JARVIS: {respuesta}\n")
-            hablar(respuesta)
+            if detener.is_set():
+                break
 
-        except KeyboardInterrupt:
-            print("\nJARVIS apagado.")
-            break
+            with audio_lock:
+                print("\n✅ ¡Activado por voz! Di tu mensaje.")
+                mensaje = escuchar()
+                if not mensaje:
+                    continue
+                print(f"Tú (voz): {mensaje}")
+                procesar_y_responder(mensaje)
+            print("Tú: ", end="", flush=True)
+
+    detener_evento = threading.Event()
+    hilo = threading.Thread(target=hilo_wake_word, args=(detener_evento,), daemon=True)
+    hilo.start()
+
+    print("JARVIS listo. Tienes 3 formas de hablarle:")
+    print("  1. Escribe tu mensaje y presiona Enter")
+    print("  2. Presiona Enter sin escribir nada, para hablarle una sola vez por voz")
+    print("  3. Di 'hey jarvis' en cualquier momento (manos libres, sin tocar nada)")
+    print("Escribe 'salir' para terminar.\n")
+
+    try:
+        while True:
+            entrada = input("Tú: ").strip()
+            if entrada.lower() in ("salir", "exit", "quit"):
+                break
+
+            with audio_lock:
+                if not entrada:
+                    # Pausamos el wake word para liberar el micrófono,
+                    # esperamos un instante a que realmente lo suelte, y
+                    # solo entonces grabamos el comando manual.
+                    pausar_wakeword.set()
+                    time.sleep(0.5)
+                    mensaje = escuchar()
+                    pausar_wakeword.clear()
+
+                    if not mensaje:
+                        continue
+                    print(f"Tú (voz): {mensaje}")
+                else:
+                    mensaje = entrada
+
+                procesar_y_responder(mensaje)
+
+    except KeyboardInterrupt:
+        pass
+    finally:
+        detener_evento.set()
+        print("\nJARVIS apagado.")
 
 
 if __name__ == "__main__":
