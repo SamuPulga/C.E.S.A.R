@@ -14,6 +14,7 @@ from src.tools.recordatorios import (
 )
 from src.tools.memoria import guardar_memoria, consultar_memoria, listar_memorias, olvidar_memoria
 from src.tools.sistema import consultar_recursos_sistema, consultar_temperatura, consultar_bateria
+from src.tools.internet import buscar_en_internet
 
 # Mapeo nombre -> función real ejecutable
 FUNCIONES = {
@@ -29,6 +30,7 @@ FUNCIONES = {
     "consultar_recursos_sistema": consultar_recursos_sistema,
     "consultar_temperatura": consultar_temperatura,
     "consultar_bateria": consultar_bateria,
+    "buscar_en_internet": buscar_en_internet,
 }
 
 # Declaraciones en formato Gemini function calling
@@ -163,5 +165,20 @@ DECLARACIONES = [
         "name": "consultar_bateria",
         "description": "Devuelve el porcentaje de batería y si está conectado a corriente.",
         "parameters": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "buscar_en_internet",
+        "description": (
+            "Busca información actual en internet (noticias, eventos recientes, "
+            "datos que cambian con el tiempo, o cualquier cosa que no sepas con "
+            "certeza). Úsala en vez de decir que no tienes la información."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "consulta": {"type": "string", "description": "La pregunta o tema a buscar"},
+            },
+            "required": ["consulta"],
+        },
     },
 ]
