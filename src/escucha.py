@@ -70,6 +70,8 @@ def escuchar():
             language="es",
             vad_filter=True,  # filtra silencios/ruido internos, mejora precisión
             beam_size=1,  # bajado de 5 (default) — más rápido, precisión casi igual
+            temperature=0.0,  # determinístico, reduce "alucinaciones" de texto inventado
+            condition_on_previous_text=False,  # evita que un error se arrastre y empeore
             initial_prompt=(
                 "Conversación con JARVIS, un asistente personal. Se habla de "
                 "recordatorios, categorías como trabajo, universidad y personal, "
