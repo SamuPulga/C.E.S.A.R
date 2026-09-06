@@ -28,7 +28,7 @@ def _cargar_modelo():
     if _modelo is None:
         from faster_whisper import WhisperModel
         print("(cargando modelo de voz por primera vez, puede tardar un momento...)")
-        _modelo = WhisperModel(MODELO_WHISPER, device="cpu", compute_type="int8")
+        _modelo = WhisperModel(MODELO_WHISPER, device="cpu", compute_type="int8", cpu_threads=8)
     return _modelo
 
 
@@ -69,6 +69,7 @@ def escuchar():
             wav_path,
             language="es",
             vad_filter=True,  # filtra silencios/ruido internos, mejora precisión
+            beam_size=1,  # bajado de 5 (default) — más rápido, precisión casi igual
             initial_prompt=(
                 "Conversación con JARVIS, un asistente personal. Se habla de "
                 "recordatorios, categorías como trabajo, universidad y personal, "
