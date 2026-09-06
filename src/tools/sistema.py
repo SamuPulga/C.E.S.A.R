@@ -58,3 +58,23 @@ def consultar_bateria() -> dict:
         "conectado_a_corriente": bateria.power_plugged,
         "tiempo_restante_segundos": bateria.secsleft if bateria.secsleft != psutil.POWER_TIME_UNLIMITED else None,
     }
+
+
+def consultar_logs_recientes(cantidad: int = 10) -> dict:
+    """
+    Devuelve las últimas interacciones registradas (transparencia/auditoría).
+    Útil para preguntas como "¿qué has hecho últimamente?".
+    """
+    from src.db import get_connection
+
+    cantidad = max(1, min(cantidad, 50))  # límite razonable, entre 1 y 50
+
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT timestamp, input_usuario, tool_llamada, tool_resultado, error "
+        "FROM logs ORDER BY id DESC LIMIT ?",
+        (cantidad,),
+    ).fetchall()
+    conn.close()
+
+    return {"ok": True, "logs": [dict(r) for r in rows]}

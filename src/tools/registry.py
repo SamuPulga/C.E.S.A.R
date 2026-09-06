@@ -13,7 +13,9 @@ from src.tools.recordatorios import (
     crear_recordatorio, listar_recordatorios, modificar_recordatorio, eliminar_recordatorio
 )
 from src.tools.memoria import guardar_memoria, consultar_memoria, listar_memorias, olvidar_memoria
-from src.tools.sistema import consultar_recursos_sistema, consultar_temperatura, consultar_bateria
+from src.tools.sistema import (
+    consultar_recursos_sistema, consultar_temperatura, consultar_bateria, consultar_logs_recientes
+)
 from src.tools.internet import buscar_en_internet
 
 # Mapeo nombre -> función real ejecutable
@@ -30,6 +32,7 @@ FUNCIONES = {
     "consultar_recursos_sistema": consultar_recursos_sistema,
     "consultar_temperatura": consultar_temperatura,
     "consultar_bateria": consultar_bateria,
+    "consultar_logs_recientes": consultar_logs_recientes,
     "buscar_en_internet": buscar_en_internet,
 }
 
@@ -99,7 +102,12 @@ DECLARACIONES = [
     },
     {
         "name": "eliminar_recordatorio",
-        "description": "Cancela un recordatorio existente por su ID.",
+        "description": (
+            "Cancela un recordatorio existente por su ID. IMPORTANTE: confirma "
+            "con el usuario cuál recordatorio quiere cancelar (di el texto del "
+            "recordatorio en voz alta) ANTES de llamar esta función, para evitar "
+            "cancelar el equivocado."
+        ),
         "parameters": {
             "type": "object",
             "properties": {
@@ -142,7 +150,15 @@ DECLARACIONES = [
     },
     {
         "name": "olvidar_memoria",
-        "description": "Elimina permanentemente un dato guardado sobre el usuario.",
+        "description": (
+            "Elimina PERMANENTEMENTE (sin posibilidad de recuperar) un dato "
+            "guardado sobre el usuario. IMPORTANTE: esta acción es irreversible "
+            "— SIEMPRE pregunta al usuario '¿seguro que quieres que olvide "
+            "[dato]? No podré recuperarlo después' y espera su confirmación "
+            "explícita en un mensaje aparte ANTES de llamar esta función. "
+            "Nunca la llames en el mismo turno en que el usuario lo pidió por "
+            "primera vez."
+        ),
         "parameters": {
             "type": "object",
             "properties": {
@@ -165,6 +181,23 @@ DECLARACIONES = [
         "name": "consultar_bateria",
         "description": "Devuelve el porcentaje de batería y si está conectado a corriente.",
         "parameters": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "consultar_logs_recientes",
+        "description": (
+            "Devuelve las últimas interacciones/acciones que has realizado "
+            "(transparencia). Úsala si el usuario pregunta algo como '¿qué has "
+            "hecho últimamente?' o '¿qué acciones has tomado hoy?'."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "cantidad": {
+                    "type": "integer",
+                    "description": "Cuántas interacciones recientes mostrar (por defecto 10, máximo 50)",
+                },
+            },
+        },
     },
     {
         "name": "buscar_en_internet",

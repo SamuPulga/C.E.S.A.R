@@ -28,7 +28,7 @@ def _cargar_modelo():
     if _modelo is None:
         from faster_whisper import WhisperModel
         print("(cargando modelo de voz por primera vez, puede tardar un momento...)")
-        _modelo = WhisperModel(MODELO_WHISPER, device="cpu", compute_type="int8", cpu_threads=8)
+        _modelo = WhisperModel(MODELO_WHISPER, device="cpu", compute_type="int8", cpu_threads=10)
     return _modelo
 
 
