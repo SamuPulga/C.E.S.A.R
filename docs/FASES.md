@@ -3,68 +3,36 @@
 Documento completo original: `docs/PROYECTO_ORIGINAL.md`.
 Este archivo es el resumen vivo de progreso.
 
-## Estado actual: Fase 7 COMPLETA ✅ — JARVIS es 100% manos libres
+## Estado actual: Fase 9 COMPLETA ✅ — 14 herramientas, voz con personalidad
 
-### ✅ Fases 0-6: núcleo, memoria, agenda, scheduler, sistema, internet
-Todas completas y validadas en vivo. 13 herramientas: hora, 4 de
-recordatorios, 4 de memoria, 3 de sistema, 1 de búsqueda en internet.
+### ✅ Fases 0-8: núcleo, memoria, agenda, scheduler, sistema, internet, voz, wake word
+Todas completas y validadas en vivo. Ver commits anteriores para detalle
+completo. 3 modos de interacción: texto, "presiona Enter para hablar",
+y wake word pasivo ("hey jarvis") — los 3 corriendo simultáneamente
+gracias a threading con locks para evitar conflictos de audio.
 
-### ✅ Fase 7 — Voz completa (VALIDADA EN VIVO, de punta a punta)
+### ✅ Ajustes de calidad de voz/transcripción
+- Voz: `es_AR-daniela-high` (femenina, calidad alta)
+- Whisper: `large-v3-turbo`, `cpu_threads=10`, `beam_size=1`,
+  `temperature=0.0`, `condition_on_previous_text=False`, VAD filter,
+  vocabulario de contexto — buen balance precisión/velocidad
+- Personalidad: JARVIS ahora es sarcástico y gracioso (system prompt)
 
-**Parte 1 — Salida de voz (TTS):**
-- Piper TTS, 100% local, voz `es_MX-ald-medium`
-- Fix de audio: Mic Boost y volúmenes ALSA en 0/muted por defecto,
-  corregidos y guardados con `alsactl store`
-
-**Parte 2 — Entrada de voz (STT):**
-- faster-whisper (modelo `small`, 100% local, CPU)
-- Detección automática de silencio con `sox` (deja de grabar solo)
-- Dispositivo correcto: DMIC integrado (`plughw:0,6`), no el genérico
-
-**Parte 3 — Wake word pasivo ("hey jarvis"):**
-- openWakeWord, modelo pre-entrenado `hey_jarvis_v0.1`
-- Nota técnica importante: Python 3.14 (el que corre el EliteBook) es
-  demasiado reciente para la versión moderna de openwakeword (necesita
-  tflite-runtime, sin wheels para 3.14 aún) — pip instaló silenciosamente
-  la versión vieja 0.4.0, con una API distinta (`wakeword_model_paths`
-  en vez de `wakeword_models`, sin `download_models()`)
-- Los 3 archivos del modelo (`melspectrogram.onnx`, `embedding_model.onnx`,
-  `hey_jarvis_v0.1.onnx`) se descargaron a mano desde los releases de
-  GitHub de openWakeWord v0.5.1, directo a la carpeta de recursos del
-  paquete instalado (`venv/.../site-packages/openwakeword/resources/models/`)
-  — **si se recrea el venv desde cero, hay que repetir esta descarga**:
-```bash
-  PKG_DIR=$(python3 -c "import openwakeword, os; print(os.path.dirname(openwakeword.__file__))")
-  mkdir -p "$PKG_DIR/resources/models" && cd "$PKG_DIR/resources/models"
-  curl -LO https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/melspectrogram.onnx
-  curl -LO https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/embedding_model.onnx
-  curl -LO https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/hey_jarvis_v0.1.onnx
-```
-- Umbral de detección ajustado a 0.3 (el default de 0.5 nunca disparaba
-  con la pronunciación real del usuario, aunque el modelo sí reaccionaba)
-- Decisión de producto: la palabra de activación quedó en inglés
-  ("hey jarvis"), aunque la idea original era una palabra personalizada
-  ("VAL") — eso requeriría entrenar un modelo custom (proceso de ML
-  aparte, con datos sintéticos y Colab), queda como posible fase futura
-
-**Cambio de arquitectura:** el modo principal de `orchestrator.py` ya NO
-usa `input()` de teclado — ahora es un loop continuo: espera wake word →
-graba comando → transcribe → procesa → responde en voz. Se perdió la
-opción de escribir texto en este modo (trade-off consciente, se puede
-recuperar más adelante si hace falta).
-
-### ✅ Robustez — Reintentos ante errores de Gemini
-Errores 500/503 ya no cierran el programa — reintenta con espera progresiva.
-
-### ✅ Ajustes de calidad de voz (sesión del 5 sept)
-- [x] Voz cambiada a `es_AR-daniela-high` (femenina, calidad alta) — antes `es_MX-ald-medium`
-- [x] Modelo de Whisper subido de `small` a `medium` (más preciso)
-- [x] Normalización de audio (`gain -n` en sox) para no depender de gritar
-- [x] Umbral de silencio bajado de 3% a 2% (capta voz más baja)
-- [x] Fix: control ALSA `Dmic0` no sobrevivía reinicios — ahora
-      `scripts/fix_audio.sh` se corre automáticamente al arrancar JARVIS
+### ✅ Fase 9 — Seguridad (VALIDADA EN VIVO)
+- [x] `consultar_logs_recientes` — transparencia, JARVIS puede reportar qué ha hecho
+- [x] Confirmación obligatoria antes de `olvidar_memoria` (borrado permanente)
+- [x] **Fix crítico real**: un bug donde decir "No, no lo borres, olvídalo"
+      causaba que JARVIS SÍ borrara el dato (confundido por la palabra
+      "olvídalo", ambigua en español). Se corrigió reforzando en el
+      system prompt que las negaciones explícitas SIEMPRE ganan sobre
+      palabras gatillo ambiguas. Validado en vivo tras el fix.
+- [x] Autenticación/autorización: decisión consciente de NO implementar
+      (un solo usuario, entrada ya protegida por SSH/Tailscale)
+- [x] Control de comandos: ya existía desde el inicio (registro central
+      FUNCIONES actúa como whitelist)
 
 ### 🔲 Pendiente / próxima sesión
-- [ ] Considerar recuperar la opción de escribir texto como alternativa al wake word
+- [ ] Fase 10 — Interfaz web/dashboard
 - [ ] Wake word personalizado ("VAL") — requiere entrenar modelo custom
-- [ ] Caché simple de búsquedas repetidas (cuidar cuota de Tavily)
+- [ ] Caché de búsquedas para cuidar cuota de Tavily
+- [ ] Fase 11 (IoT), 12 (Visión), 13 (Sistemas distribuidos) — futuro lejano
