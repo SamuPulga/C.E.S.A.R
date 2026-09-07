@@ -1,23 +1,9 @@
 """
 Orquestador principal de C.E.S.A.R.
-
-Filosofía: Gemini piensa, C.E.S.A.R ejecuta.
-  1. El usuario escribe algo.
-  2. Se le manda a Gemini junto con la lista de herramientas disponibles.
-  3. Gemini responde con texto normal, O con una petición de function call.
-  4. Si pide function call: el orquestador VALIDA y ejecuta la función real,
-     y le devuelve el resultado a Gemini para que genere la respuesta final.
-     Esto puede encadenarse varias veces antes de la respuesta final.
-  5. Todo se loguea en SQLite (tabla `logs`) para poder debuggear después.
-
-Requiere: pip install google-genai (ver requirements.txt)
-
-NOTA: este archivo usa el SDK nuevo `google-genai` (el que reemplaza al
-descontinuado `google-generativeai`). Ver docs/FASES.md para el historial
-de esta migración.
 """
 import os
 import time
+import random
 import subprocess
 import threading
 from datetime import datetime
@@ -37,15 +23,63 @@ load_dotenv("config/.env")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-lite")
 
+UMBRAL_CONVERSACION_ACTIVA_SEG = 180
+_ultima_interaccion = {"tiempo": None}
+
+SALUDOS_ACTIVACION = [
+    "Dime.",
+    "Te escucho.",
+    "¿Qué necesitas?",
+    "Aquí estoy.",
+    "Adelante.",
+    "Dispara.",
+    "Soy todo oídos.",
+]
+
+DIAS_SEMANA = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+MESES = [
+    "enero", "febrero", "marzo", "abril", "mayo", "junio",
+    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+]
+
+DATOS_CURIOSOS = [
+    "Dato random: los pulpos tienen tres corazones.",
+    "Dato random: la miel nunca se daña — se ha encontrado miel comestible de hace 3000 años.",
+    "Dato random: un día en Venus dura más que un año en Venus.",
+    "Dato random: los flamencos son rosados por lo que comen, no de nacimiento.",
+    "Dato random: el corazón de una ballena azul pesa como un auto pequeño.",
+    "Dato random: las huellas de la nariz de un perro son únicas, como las de nuestros dedos.",
+    "Dato random: hay más posibles partidas de ajedrez que átomos en el universo observable.",
+    "Dato random: los plátanos son técnicamente bayas, pero las fresas no.",
+]
+
+
+def _construir_saludo_activacion() -> str:
+    ahora = datetime.now()
+    ultima = _ultima_interaccion["tiempo"]
+    conversacion_activa = (
+        ultima is not None
+        and (ahora - ultima).total_seconds() < UMBRAL_CONVERSACION_ACTIVA_SEG
+    )
+
+    if conversacion_activa:
+        return random.choice(SALUDOS_ACTIVACION)
+
+    dia_semana = DIAS_SEMANA[ahora.weekday()]
+    mes = MESES[ahora.month - 1]
+    hora_str = ahora.strftime("%I:%M %p").lstrip("0")
+
+    partes = [
+        random.choice(SALUDOS_ACTIVACION),
+        f"Son las {hora_str} del {dia_semana} {ahora.day} de {mes}.",
+    ]
+    if random.random() < 0.35:
+        partes.append(random.choice(DATOS_CURIOSOS))
+
+    return " ".join(partes)
+
 
 def _asegurar_audio():
-    """
-    Corre scripts/fix_audio.sh al arrancar, para garantizar que los
-    controles de volumen/mute de ALSA estén bien configurados — en este
-    hardware específico, algunos no sobreviven confiablemente un reinicio.
-    Falla en silencio si el script no está o algo sale mal; no debe
-    impedir que C.E.S.A.R arranque.
-    """
     try:
         subprocess.run(
             ["bash", "scripts/fix_audio.sh"],
@@ -53,17 +87,10 @@ def _asegurar_audio():
             timeout=10,
         )
     except Exception:
-        pass  # si falla, seguimos igual; el usuario puede ajustarlo a mano
+        pass
 
 
 def construir_system_prompt() -> str:
-    """
-    Genera el prompt de sistema incluyendo la fecha/hora actual real.
-
-    Esto es importante: sin esto, Gemini no sabe qué día es "hoy" y puede
-    asumir un año incorrecto (basado en su fecha de entrenamiento) al
-    interpretar fechas relativas como "el 15 de diciembre" o "mañana".
-    """
     ahora = datetime.now().strftime("%Y-%m-%d %H:%M (%A)")
     return f"""Eres C.E.S.A.R, el asistente personal de Samuel, ejecutándose
 en su EliteBook. Eres directo, útil, y usas las herramientas disponibles
@@ -103,7 +130,6 @@ interpretar cualquier fecha relativa que mencione el usuario (ej. "mañana",
 
 
 def construir_tool() -> types.Tool:
-    """Convierte nuestro registro de herramientas (dicts) al formato del SDK nuevo."""
     declaraciones = [
         types.FunctionDeclaration(
             name=d["name"],
@@ -116,11 +142,6 @@ def construir_tool() -> types.Tool:
 
 
 def ejecutar_tool(nombre: str, parametros: dict) -> dict:
-    """
-    Ejecuta una herramienta por nombre, validando que exista en el registro.
-    Este es el punto central de seguridad: nada se ejecuta si no está
-    explícitamente registrado en src/tools/registry.py.
-    """
     funcion = FUNCIONES.get(nombre)
     if funcion is None:
         return {"ok": False, "error": f"Herramienta desconocida: {nombre}"}
@@ -131,42 +152,27 @@ def ejecutar_tool(nombre: str, parametros: dict) -> dict:
 
 
 def _enviar_con_reintento(chat, mensaje, intentos_maximos=3):
-    """
-    Envía un mensaje al chat, reintentando automáticamente si Google
-    devuelve un error temporal del servidor (500/503 - "alta demanda").
-    Esto evita que C.E.S.A.R se cierre por completo por un problema pasajero
-    que se resuelve solo en unos segundos.
-    """
     for intento in range(1, intentos_maximos + 1):
         try:
             return chat.send_message(message=mensaje)
         except ServerError as e:
             if intento == intentos_maximos:
                 raise
-            espera = 2 * intento  # espera un poco más en cada reintento
+            espera = 2 * intento
             print(f"(⚠️  Servidor de Gemini ocupado, reintentando en {espera}s... [{intento}/{intentos_maximos}])")
             time.sleep(espera)
 
 
 def procesar_mensaje(chat, mensaje_usuario: str) -> str:
-    """
-    Procesa un mensaje del usuario, incluyendo el ciclo de function calling.
-
-    IMPORTANTE: Gemini puede encadenar VARIAS llamadas a herramientas antes
-    de dar una respuesta final en texto (ej. si la primera falla y necesita
-    reintentar con otros parámetros). Por eso este es un LOOP, no una sola
-    verificación — se repite hasta que la respuesta sea texto normal.
-    """
     respuesta = _enviar_con_reintento(chat, mensaje_usuario)
 
-    MAX_LLAMADAS_ENCADENADAS = 5  # límite de seguridad para evitar loops infinitos
+    MAX_LLAMADAS_ENCADENADAS = 5
     intentos = 0
 
     while intentos < MAX_LLAMADAS_ENCADENADAS:
         if not respuesta.function_calls:
-            # Ya no hay más llamadas a herramientas, esto es la respuesta final
             if intentos == 0:
-                log_interaccion(mensaje_usuario)  # no se usó ninguna herramienta
+                log_interaccion(mensaje_usuario)
             return respuesta.text
 
         function_call = respuesta.function_calls[0]
@@ -198,24 +204,16 @@ def main():
     config = types.GenerateContentConfig(
         system_instruction=construir_system_prompt(),
         tools=[construir_tool()],
-        # Deshabilitado a propósito: queremos ejecutar las herramientas
-        # nosotros mismos (vía ejecutar_tool), validándolas contra el
-        # registro central, no dejar que el SDK las llame automáticamente.
         automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
     )
 
     chat = client.chats.create(model=GEMINI_MODEL, config=config)
 
-    # Un solo candado compartido entre el hilo de wake word y el hilo
-    # principal (teclado), para que nunca intenten usar el micrófono o
-    # hablarle a Gemini al mismo tiempo — se turnan.
     audio_lock = threading.Lock()
-    # Señal para pausar el wake word mientras el modo "presiona Enter para
-    # hablar" usa el micrófono directamente (si no, chocan por el mismo
-    # dispositivo de audio exclusivo).
     pausar_wakeword = threading.Event()
 
     def procesar_y_responder(mensaje: str):
+        _ultima_interaccion["tiempo"] = datetime.now()
         try:
             respuesta = procesar_mensaje(chat, mensaje)
         except (ServerError, ClientError) as e:
@@ -225,25 +223,27 @@ def main():
         hablar(respuesta)
 
     def hilo_wake_word(detener: threading.Event):
-        """Corre en segundo plano todo el tiempo, escuchando 'hey jarvis'."""
         while not detener.is_set():
             try:
                 esperar_wake_word(pausar=pausar_wakeword)
             except Exception as e:
                 print(f"(⚠️  Error en detección de wake word: {e})")
-                time.sleep(2)  # evita un loop agresivo si el error persiste
+                time.sleep(2)
                 continue
 
             if detener.is_set():
                 break
 
             with audio_lock:
-                print("\n✅ ¡Activado por voz! Di tu mensaje.")
+                print("\n✅ ¡Activado por voz!")
+                hablar(_construir_saludo_activacion())
+                print("Di tu mensaje.")
                 mensaje = escuchar()
                 if not mensaje:
                     continue
                 print(f"Tú (voz): {mensaje}")
                 procesar_y_responder(mensaje)
+                time.sleep(1.5)
             print("Tú: ", end="", flush=True)
 
     detener_evento = threading.Event()
@@ -264,9 +264,6 @@ def main():
 
             with audio_lock:
                 if not entrada:
-                    # Pausamos el wake word para liberar el micrófono,
-                    # esperamos un instante a que realmente lo suelte, y
-                    # solo entonces grabamos el comando manual.
                     pausar_wakeword.set()
                     time.sleep(0.5)
                     mensaje = escuchar()
