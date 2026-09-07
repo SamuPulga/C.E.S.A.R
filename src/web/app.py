@@ -74,7 +74,7 @@ def dashboard():
 <head>
     <meta charset="UTF-8">
     <meta http-equiv="refresh" content="15">
-    <title>J.A.R.V.I.S — Panel de control</title>
+    <title>C.E.S.A.R — Panel de control</title>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400..900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
     <style>
         * {{ box-sizing: border-box; }}
@@ -208,7 +208,7 @@ def dashboard():
     </style>
 </head>
 <body>
-    <h1>J.A.R.V.I.S<span class="estado"><span class="punto"></span>ONLINE</span></h1>
+    <h1>C.E.S.A.R<span class="estado"><span class="punto"></span>ONLINE</span></h1>
 
     <div class="grid">
         <div class="card">

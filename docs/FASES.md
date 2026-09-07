@@ -1,30 +1,29 @@
-# Roadmap de fases — JARVIS
+# Roadmap de fases — C.E.S.A.R (antes JARVIS)
 
 Documento completo original: `docs/PROYECTO_ORIGINAL.md`.
 Este archivo es el resumen vivo de progreso.
 
-## Estado actual: Fase 10a COMPLETA ✅ — Dashboard web holográfico
+## Estado actual: Fase 10a COMPLETA ✅ — Renombrado a C.E.S.A.R
 
-### ✅ Fases 0-9: núcleo, memoria, agenda, scheduler, sistema, internet,
-### voz, wake word, seguridad
+### ✅ Fases 0-10a: núcleo, memoria, agenda, scheduler, sistema, internet,
+### voz, wake word, seguridad, dashboard web
 Todas completas y validadas en vivo. 14 herramientas, 3 modos de
-interacción (texto, presiona-Enter, wake word "hey jarvis"),
-confirmaciones antes de borrados permanentes, logs de auditoría.
+interacción, dashboard web holográfico en `http://100.70.139.115:8080`.
 
-### ✅ Fase 10a — Dashboard web de solo lectura (VALIDADA EN VIVO)
-- [x] `src/web/app.py` — FastAPI, una sola página con auto-refresh cada 15s
-- [x] Muestra: CPU/RAM/disco/temperatura/batería, agenda pendiente, memoria
-- [x] Estética holográfica tipo HUD (cian brillante, esquinas tipo
-      interfaz de ciencia ficción, fuente Orbitron) — pedido explícito
-      del usuario para que "se sienta vivo"
-- [x] Corriendo como servicio systemd (`jarvis-web.service`), puerto 8080
-- [x] Accesible desde cualquier dispositivo en la red Tailscale:
-      `http://100.70.139.115:8080`
-- [x] Sin autenticación propia (decisión de Fase 9: se apoya en que
-      Tailscale/SSH ya son la barrera de entrada)
+### ✅ Renombrado: JARVIS → C.E.S.A.R
+- [x] System prompt, mensajes en pantalla, notificaciones push, README,
+      y el dashboard web ahora dicen "C.E.S.A.R" (en honor a un profesor
+      que Samuel aprecia)
+- [x] Fix de pronunciación: "C.E.S.A.R" se leía letra por letra en voz
+      alta (como sigla) — se corrigió para que Piper diga "César" natural
+- [x] La palabra de activación técnica POR AHORA sigue siendo "hey jarvis"
+      (openWakeWord no tiene un modelo pre-entrenado para "Cesar")
 
 ### 🔲 Pendiente / próxima sesión
-- [ ] Fase 10b — Chat vía web (opcional, ya existe por voz/texto en terminal)
-- [ ] Wake word personalizado ("VAL") — requiere entrenar modelo custom
+- [ ] **Entrenar wake word personalizado para "Cesar"** — requiere Google
+      Colab, generación de audio sintético (TTS variado), y entrenar un
+      modelo pequeño con el pipeline de entrenamiento de openWakeWord.
+      Es la tarea grande pendiente más importante ahora mismo.
+- [ ] Fase 10b — chat también por la web (no solo dashboard de lectura)
 - [ ] Caché de búsquedas para cuidar cuota de Tavily
 - [ ] Fase 11 (IoT), 12 (Visión), 13 (Sistemas distribuidos) — futuro lejano

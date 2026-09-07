@@ -1,11 +1,9 @@
 """
 Síntesis de voz (Fase 7, primera parte) usando Piper TTS.
 
-JARVIS convierte sus respuestas de texto a voz y las reproduce por los
+C.E.S.A.R convierte sus respuestas de texto a voz y las reproduce por los
 parlantes del EliteBook. 100% local: no depende de ninguna API externa,
 así que no tiene costo ni límite de uso.
-
-Pendiente para la próxima sesión: entrada de voz (micrófono + wake word).
 """
 import subprocess
 import tempfile
@@ -17,6 +15,10 @@ VOICE_MODEL = "voices/es_AR-daniela-high.onnx"
 
 def _limpiar_para_voz(texto: str) -> str:
     """Quita símbolos de Markdown que sonarían raro leídos en voz alta."""
+    # "C.E.S.A.R" se lee letra por letra si se lo dejamos así — para la
+    # voz (no para el texto escrito) lo convertimos a "César" para que
+    # se pronuncie como un nombre normal.
+    texto = texto.replace("C.E.S.A.R", "César")
     texto = re.sub(r"[*_#`]", "", texto)
     texto = re.sub(r"\n+", ". ", texto)
     return texto.strip()
@@ -28,7 +30,7 @@ def hablar(texto: str):
 
     Si algo falla (Piper no instalado, sin audio, etc.), falla en silencio
     con un aviso en la terminal — un problema de voz nunca debe romper el
-    chat de texto, que sigue siendo la forma principal de usar JARVIS.
+    chat de texto, que sigue siendo la forma principal de usar C.E.S.A.R.
     """
     if not texto:
         return

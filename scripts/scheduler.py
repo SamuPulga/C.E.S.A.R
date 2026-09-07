@@ -70,7 +70,7 @@ def revisar_recordatorios_vencidos() -> int:
 
     for r in vencidos:
         enviar_notificacion(
-            titulo="JARVIS",
+            titulo="C.E.S.A.R",
             mensaje=f"[{r['categoria']} · {r['prioridad']}] {r['texto']}",
             prioridad=r["prioridad"],
         )

@@ -1,11 +1,11 @@
-# JARVIS — Asistente personal en EliteBook
+# C.E.S.A.R — Asistente personal en EliteBook
 
 Asistente personal ejecutándose de forma nativa en un HP EliteBook 630 13" G9
 ("elitebook1samuel1hpl"), corriendo Ubuntu Server 24.04 LTS headless.
 
 ## Filosofía
 
-- **Gemini piensa, JARVIS ejecuta.** El modelo (Gemini, vía API) decide qué
+- **Gemini piensa, C.E.S.A.R ejecuta.** El modelo (Gemini, vía API) decide qué
   herramienta usar y con qué parámetros. El orquestador en Python ejecuta
   esa herramienta y devuelve el resultado. Gemini nunca ejecuta código
   directamente.
@@ -26,7 +26,7 @@ Ver `docs/ESTADO_ELITEBOOK.md` para el inventario completo del equipo
 ```
 jarvis/
 ├── config/
-│   └── tools_contract.md    # Contrato de cada herramienta que JARVIS puede usar
+│   └── tools_contract.md    # Contrato de cada herramienta que C.E.S.A.R puede usar
 ├── src/
 │   ├── orchestrator.py      # Loop principal: recibe input -> llama a Gemini -> ejecuta tool
 │   ├── db.py                # Capa de acceso a SQLite (WAL mode)

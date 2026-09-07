@@ -1,7 +1,7 @@
 """
-Orquestador principal de JARVIS.
+Orquestador principal de C.E.S.A.R.
 
-Filosofía: Gemini piensa, JARVIS ejecuta.
+Filosofía: Gemini piensa, C.E.S.A.R ejecuta.
   1. El usuario escribe algo.
   2. Se le manda a Gemini junto con la lista de herramientas disponibles.
   3. Gemini responde con texto normal, O con una petición de function call.
@@ -44,7 +44,7 @@ def _asegurar_audio():
     controles de volumen/mute de ALSA estén bien configurados — en este
     hardware específico, algunos no sobreviven confiablemente un reinicio.
     Falla en silencio si el script no está o algo sale mal; no debe
-    impedir que JARVIS arranque.
+    impedir que C.E.S.A.R arranque.
     """
     try:
         subprocess.run(
@@ -65,7 +65,7 @@ def construir_system_prompt() -> str:
     interpretar fechas relativas como "el 15 de diciembre" o "mañana".
     """
     ahora = datetime.now().strftime("%Y-%m-%d %H:%M (%A)")
-    return f"""Eres JARVIS, el asistente personal de Samuel, ejecutándose
+    return f"""Eres C.E.S.A.R, el asistente personal de Samuel, ejecutándose
 en su EliteBook. Eres directo, útil, y usas las herramientas disponibles
 cuando corresponde en vez de inventar información. Tienes una herramienta
 de búsqueda en internet (buscar_en_internet) para preguntas sobre
@@ -134,7 +134,7 @@ def _enviar_con_reintento(chat, mensaje, intentos_maximos=3):
     """
     Envía un mensaje al chat, reintentando automáticamente si Google
     devuelve un error temporal del servidor (500/503 - "alta demanda").
-    Esto evita que JARVIS se cierre por completo por un problema pasajero
+    Esto evita que C.E.S.A.R se cierre por completo por un problema pasajero
     que se resuelve solo en unos segundos.
     """
     for intento in range(1, intentos_maximos + 1):
@@ -219,9 +219,9 @@ def main():
         try:
             respuesta = procesar_mensaje(chat, mensaje)
         except (ServerError, ClientError) as e:
-            print(f"JARVIS: Tuve un problema conectándome con Gemini ({e}). Intenta de nuevo en un momento.\n")
+            print(f"CESAR: Tuve un problema conectándome con Gemini ({e}). Intenta de nuevo en un momento.\n")
             return
-        print(f"JARVIS: {respuesta}\n")
+        print(f"CESAR: {respuesta}\n")
         hablar(respuesta)
 
     def hilo_wake_word(detener: threading.Event):
@@ -250,10 +250,10 @@ def main():
     hilo = threading.Thread(target=hilo_wake_word, args=(detener_evento,), daemon=True)
     hilo.start()
 
-    print("JARVIS listo. Tienes 3 formas de hablarle:")
+    print("C.E.S.A.R listo. Tienes 3 formas de hablarle:")
     print("  1. Escribe tu mensaje y presiona Enter")
     print("  2. Presiona Enter sin escribir nada, para hablarle una sola vez por voz")
-    print("  3. Di 'hey jarvis' en cualquier momento (manos libres, sin tocar nada)")
+    print("  3. Di 'hey jarvis' en cualquier momento (esa sigue siendo la palabra de activación técnica por ahora)")
     print("Escribe 'salir' para terminar.\n")
 
     try:
@@ -284,7 +284,7 @@ def main():
         pass
     finally:
         detener_evento.set()
-        print("\nJARVIS apagado.")
+        print("\nC.E.S.A.R apagado.")
 
 
 if __name__ == "__main__":
