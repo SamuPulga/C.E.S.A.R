@@ -151,20 +151,55 @@ def ejecutar_tool(nombre: str, parametros: dict) -> dict:
         return {"ok": False, "error": f"Parámetros inválidos para {nombre}: {e}"}
 
 
-def _enviar_con_reintento(chat, mensaje, intentos_maximos=3):
-    for intento in range(1, intentos_maximos + 1):
-        try:
-            return chat.send_message(message=mensaje)
-        except ServerError as e:
-            if intento == intentos_maximos:
-                raise
-            espera = 2 * intento
-            print(f"(⚠️  Servidor de Gemini ocupado, reintentando en {espera}s... [{intento}/{intentos_maximos}])")
-            time.sleep(espera)
+MODELOS_RESPALDO = [
+    GEMINI_MODEL,
+    "gemini-3.5-flash-lite",
+    "gemini-2.5-flash",
+]
 
 
-def procesar_mensaje(chat, mensaje_usuario: str) -> str:
-    respuesta = _enviar_con_reintento(chat, mensaje_usuario)
+def _crear_chat(client, config, modelo, historial=None):
+    return client.chats.create(model=modelo, config=config, history=historial or [])
+
+
+def _enviar_con_reintento(client, config, estado, mensaje, intentos_por_modelo=2):
+    """
+    Envía un mensaje al chat activo. Si Gemini está ocupado, reintenta con
+    backoff y, si el modelo actual sigue fallando, cae al siguiente modelo
+    de MODELOS_RESPALDO conservando el historial de la conversación.
+    """
+    while estado["indice_modelo"] < len(MODELOS_RESPALDO):
+        modelo_actual = MODELOS_RESPALDO[estado["indice_modelo"]]
+
+        for intento in range(1, intentos_por_modelo + 1):
+            try:
+                return estado["chat"].send_message(message=mensaje)
+            except ServerError:
+                es_ultimo_intento = intento == intentos_por_modelo
+                hay_respaldo = estado["indice_modelo"] + 1 < len(MODELOS_RESPALDO)
+
+                if not es_ultimo_intento:
+                    espera = 2 * intento
+                    print(f"(⚠️  {modelo_actual} ocupado, reintentando en {espera}s... [{intento}/{intentos_por_modelo}])")
+                    time.sleep(espera)
+                    continue
+
+                if not hay_respaldo:
+                    raise
+
+                estado["indice_modelo"] += 1
+                modelo_respaldo = MODELOS_RESPALDO[estado["indice_modelo"]]
+                print(f"(⚠️  {modelo_actual} sigue ocupado. Cambiando a modelo de respaldo: {modelo_respaldo})")
+
+                historial = estado["chat"].get_history()
+                estado["chat"] = _crear_chat(client, config, modelo_respaldo, historial)
+                break
+
+    raise RuntimeError("Todos los modelos de Gemini (principal y respaldo) están ocupados. Intenta de nuevo en unos minutos.")
+
+
+def procesar_mensaje(client, config, estado, mensaje_usuario: str) -> str:
+    respuesta = _enviar_con_reintento(client, config, estado, mensaje_usuario)
 
     MAX_LLAMADAS_ENCADENADAS = 5
     intentos = 0
@@ -186,11 +221,10 @@ def procesar_mensaje(chat, mensaje_usuario: str) -> str:
             name=nombre_tool,
             response={"result": resultado},
         )
-        respuesta = _enviar_con_reintento(chat, function_response_part)
+        respuesta = _enviar_con_reintento(client, config, estado, function_response_part)
         intentos += 1
 
     return "Se alcanzó el límite de intentos encadenados sin obtener una respuesta final. Intenta reformular tu mensaje."
-
 
 def main():
     if not GEMINI_API_KEY:
@@ -208,6 +242,7 @@ def main():
     )
 
     chat = client.chats.create(model=GEMINI_MODEL, config=config)
+    estado_modelo = {"chat": chat, "indice_modelo": 0}
 
     audio_lock = threading.Lock()
     pausar_wakeword = threading.Event()
@@ -215,7 +250,7 @@ def main():
     def procesar_y_responder(mensaje: str):
         _ultima_interaccion["tiempo"] = datetime.now()
         try:
-            respuesta = procesar_mensaje(chat, mensaje)
+                        respuesta = procesar_mensaje(client, config, estado_modelo, mensaje)
         except (ServerError, ClientError) as e:
             print(f"CESAR: Tuve un problema conectándome con Gemini ({e}). Intenta de nuevo en un momento.\n")
             return
