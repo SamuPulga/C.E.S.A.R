@@ -41,7 +41,7 @@ jarvis/
 
 ## Estado actual
 
-🟡 Fase 0 en progreso — repo creado, contrato de herramientas en diseño.
+ Fase 0 en progreso — repo creado, contrato de herramientas en diseño.
 
 ## Setup rápido (cuando estés en el EliteBook)
 
