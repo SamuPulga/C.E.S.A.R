@@ -1,8 +1,8 @@
-========================================================================
+
 ESTADO DEL SISTEMA: HP EliteBook 630 13" G9 — "elitebook1samuel1hpl"
 Referencia técnica para continuar trabajando en nuevas conversaciones
 Última actualización: Septiembre 2026
-========================================================================
+
 
 --------------------------------------------------------------------
 1. HARDWARE
